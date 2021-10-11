@@ -15,18 +15,45 @@
  */
 
 /**
- * APDS CONFIG PART
+ * required by APDS and AXDL
  */
 #include <Wire.h>
+
+/**
+ * APDS CONFIG PART
+ */
 #include <SparkFun_APDS9960.h>
 #define APDS9960INT 2 // Interrupt pin
 SparkFun_APDS9960 apds = SparkFun_APDS9960();
 int isrFlag = 0;
 
+/**
+ * AXDL CONFIG PART
+ */
+#include <ADXL345.h>
+ADXL345 adxl; // variable adxl is an instance of the ADXL345 library
+
 // #include <Wire.h>
 // #include <LiquidCrystal_I2C.h>
 
 // LiquidCrystal_I2C lcd1(0x25, 20, 4);
+
+/**
+ * Configures APDS sensor
+ *
+ * Part copied from axdl library demo
+ */
+void axdlConfig() {
+  adxl.powerOn();
+
+  // set activity/ inactivity thresholds (0-255)
+  adxl.setActivityThreshold(75);   // 62.5mg per increment
+  adxl.setInactivityThreshold(75); // 62.5mg per increment
+  adxl.setTimeInactivity(10); // how many seconds of no activity is inactive?
+
+  // look of activity movement on this axes - 1 == on; 0 == off
+  adxl.setActivityX(1);
+}
 
 /**
  * Configures APDS sensor
@@ -74,6 +101,20 @@ void checkApds() {
   }
 }
 
+/**
+ * Loop functionality for APDS
+ * Part copied from axdl library demo
+ */
+void checkAxdl() {
+  int x, y, z;
+  // read the accelerometer values and store them in variables  x,y,z
+  adxl.readXYZ(&x, &y, &z);
+
+  // Output x,y,z values
+  // Serial.print("Value of X:");
+  // Serial.println(x);
+}
+
 void interruptRoutine() { isrFlag = 1; }
 
 /**
@@ -109,8 +150,13 @@ void handleGesture() {
 
 void setup() {
   Serial.begin(9600);
+  Serial.println("Initializing");
 
   apdsConfig();
+  axdlConfig();
 }
 
-void loop() { checkApds(); }
+void loop() {
+  checkApds();
+  checkAxdl();
+}
