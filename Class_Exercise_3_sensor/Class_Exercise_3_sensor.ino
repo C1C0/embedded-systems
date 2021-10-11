@@ -40,6 +40,9 @@
  * | ---- ------------ |
  * |     _             |
  * |___________________|
+ * .....................................
+ *
+ * also adding servo ... just for fun
  */
 
 /**
@@ -67,6 +70,25 @@ int x, y, z;
  */
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+/**
+ * Servo config part
+ */
+#include <Servo.h>
+#define SERVO_PIN 9
+Servo myservo; // create servo object to control a servo
+int pos = 0;   // variable to store the servo positio
+
+void servoConfig() {
+  myservo.attach(SERVO_PIN); // attaches the servo on pin 9 to the servo object
+  myservo.write(0);
+  delay(2000);
+  myservo.write(90);
+  delay(2000);
+  myservo.write(180);
+  delay(2000);
+  myservo.write(90);
+}
 
 void displayConfig() {
   lcd.init();
@@ -228,6 +250,10 @@ int calculateStep() {
   }
 }
 
+int calculateServo() {
+  return map(x, -255, 255, 5, 175);
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Initializing");
@@ -235,19 +261,25 @@ void setup() {
   // apdsConfig();
   axdlConfig();
   displayConfig();
+  servoConfig();
 }
 
 void loop() {
   // checkApds();
   checkAxdl();
 
+  breakLine(17, calculateStep());
+
   char str[20];
   sprintf(str, "%d", x);
-
-  breakLine(17, calculateStep());
 
   printToLCDString(lcd, 1, 3, "      ");
   printToLCDString(lcd, 1, 3, str);
 
-  delay(333);
+  myservo.write(calculateServo());
+
+  // sprintf(str, "%d", calculateServo());
+  // Serial.println(str);
+
+  delay(150);
 }
