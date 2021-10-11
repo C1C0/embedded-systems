@@ -11,30 +11,30 @@
  * @date 2021-10-11
  *
  * @copyright Copyright (c) 2021
- * 
+ *
  * WHat is this mini-project about
- * 
- * ON LCD display show position of something on the 
- * line 
- * 
+ *
+ * ON LCD display show position of something on the
+ * line
+ *
  * e.g. (display):
  * AXDL sensor: 0 - in the middle
- * -255 <= x <= 255
- * 1 step = x -/+ 15
+ * -255 <= x <= 255 ... dogether 510 individual bits
+ * 1 step = x -/+ 30
  * 17 steps overall
- * 
+ *
  * if(x == 0)
  *  ___________________
  * | -------- -------- |
  * |         _         |
  * |___________________|
- * 
+ *
  * if(x == 60)
  *  ___________________
  * | ------------ ---- |
  * |             _     |
  * |___________________|
- * 
+ *
  * if(x == -60)
  *  ___________________
  * | ---- ------------ |
@@ -79,12 +79,36 @@ void displayConfig() {
   printToLCDString(lcd, 1, 1, "This is your plane");
   delay(1000);
   lcd.clear();
-  printToLCDString(lcd, 1, 1, "------------------");
 }
 
 void printToLCDString(LiquidCrystal_I2C lcd, int col, int row, String message) {
   lcd.setCursor(col, row);
   lcd.print(message);
+}
+
+void breakLine(int overAllSteps, int actualStep) {
+  char steps[overAllSteps + 2] = {};
+  char underSteps[overAllSteps + 2] = {};
+  char str[20];
+
+  // get all steps
+  for (int i = 0; i < overAllSteps; i++) {
+    // do not display last step
+    if (i == actualStep) {
+      steps[i] = ' ';
+      underSteps[i] = '-';
+      continue;
+    }
+
+    steps[i] = '-';
+    underSteps[i] = ' ';
+  }
+
+  strcpy(str, steps);
+  printToLCDString(lcd, 1, 1, str);
+
+  strcpy(str, underSteps);
+  printToLCDString(lcd, 1, 2, str);
 }
 
 /**
@@ -194,24 +218,36 @@ void handleGesture() {
   }
 }
 
+int calculateStep() {
+  // check if we are in plus or minus numbers
+  if (x > 0) {
+    return x / 30 + 7;
+  } else {
+    int plusX = x * -1;
+    return 7 - plusX / 30;
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Initializing");
 
-  apdsConfig();
+  // apdsConfig();
   axdlConfig();
   displayConfig();
 }
 
 void loop() {
-  checkApds();
+  // checkApds();
   checkAxdl();
 
   char str[20];
   sprintf(str, "%d", x);
 
+  breakLine(17, calculateStep());
+
   printToLCDString(lcd, 1, 3, "      ");
   printToLCDString(lcd, 1, 3, str);
 
-  delay(250);
+  delay(333);
 }
