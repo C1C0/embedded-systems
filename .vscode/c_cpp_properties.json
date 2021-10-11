@@ -21,6 +21,7 @@
                 "C:\\Program Files (x86)\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
                 "C:\\Users\\kpsko\\Documents\\Arduino\\libraries\\SparkFun_APDS9960_RGB_and_Gesture_Sensor\\src",
                 "C:\\Users\\kpsko\\Documents\\Arduino\\libraries\\Accelerometer_ADXL345",
+                "C:\\Users\\kpsko\\Documents\\Arduino\\libraries\\LiquidCrystal_I2C",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\7.3.0\\include",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\7.3.0\\include-fixed",
                 "c:\\program files (x86)\\arduino\\hardware\\tools\\avr\\avr\\include"

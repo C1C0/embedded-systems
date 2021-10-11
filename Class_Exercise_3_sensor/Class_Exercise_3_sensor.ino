@@ -11,11 +11,39 @@
  * @date 2021-10-11
  *
  * @copyright Copyright (c) 2021
- *
+ * 
+ * WHat is this mini-project about
+ * 
+ * ON LCD display show position of something on the 
+ * line 
+ * 
+ * e.g. (display):
+ * AXDL sensor: 0 - in the middle
+ * -255 <= x <= 255
+ * 1 step = x -/+ 15
+ * 17 steps overall
+ * 
+ * if(x == 0)
+ *  ___________________
+ * | -------- -------- |
+ * |         _         |
+ * |___________________|
+ * 
+ * if(x == 60)
+ *  ___________________
+ * | ------------ ---- |
+ * |             _     |
+ * |___________________|
+ * 
+ * if(x == -60)
+ *  ___________________
+ * | ---- ------------ |
+ * |     _             |
+ * |___________________|
  */
 
 /**
- * required by APDS and AXDL
+ * required by APDS and AXDL and display
  */
 #include <Wire.h>
 
@@ -32,11 +60,32 @@ int isrFlag = 0;
  */
 #include <ADXL345.h>
 ADXL345 adxl; // variable adxl is an instance of the ADXL345 library
+int x, y, z;
 
-// #include <Wire.h>
-// #include <LiquidCrystal_I2C.h>
+/**
+ * Display CONFIG PART
+ */
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
-// LiquidCrystal_I2C lcd1(0x25, 20, 4);
+void displayConfig() {
+  lcd.init();
+
+  lcd.backlight();
+
+  printToLCDString(lcd, 1, 1, "--Initialization--");
+  delay(1000);
+  lcd.clear();
+  printToLCDString(lcd, 1, 1, "This is your plane");
+  delay(1000);
+  lcd.clear();
+  printToLCDString(lcd, 1, 1, "------------------");
+}
+
+void printToLCDString(LiquidCrystal_I2C lcd, int col, int row, String message) {
+  lcd.setCursor(col, row);
+  lcd.print(message);
+}
 
 /**
  * Configures APDS sensor
@@ -53,6 +102,8 @@ void axdlConfig() {
 
   // look of activity movement on this axes - 1 == on; 0 == off
   adxl.setActivityX(1);
+
+  adxl.setInactivityX(0);
 }
 
 /**
@@ -106,13 +157,8 @@ void checkApds() {
  * Part copied from axdl library demo
  */
 void checkAxdl() {
-  int x, y, z;
-  // read the accelerometer values and store them in variables  x,y,z
+  // read the accelerometer values and store them in variables  x
   adxl.readXYZ(&x, &y, &z);
-
-  // Output x,y,z values
-  // Serial.print("Value of X:");
-  // Serial.println(x);
 }
 
 void interruptRoutine() { isrFlag = 1; }
@@ -154,9 +200,18 @@ void setup() {
 
   apdsConfig();
   axdlConfig();
+  displayConfig();
 }
 
 void loop() {
   checkApds();
   checkAxdl();
+
+  char str[20];
+  sprintf(str, "%d", x);
+
+  printToLCDString(lcd, 1, 3, "      ");
+  printToLCDString(lcd, 1, 3, str);
+
+  delay(250);
 }
