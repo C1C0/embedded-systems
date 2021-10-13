@@ -64,6 +64,7 @@ int isrFlag = 0;
 #include <ADXL345.h>
 ADXL345 adxl; // variable adxl is an instance of the ADXL345 library
 int x, y, z;
+int xBefore;
 
 /**
  * Display CONFIG PART
@@ -96,9 +97,6 @@ void displayConfig() {
   lcd.backlight();
 
   printToLCDString(lcd, 1, 1, "--Initialization--");
-  delay(1000);
-  lcd.clear();
-  printToLCDString(lcd, 1, 1, "This is your plane");
   delay(1000);
   lcd.clear();
 }
@@ -251,7 +249,12 @@ int calculateStep() {
 }
 
 int calculateServo() {
-  return map(x, -255, 255, 5, 175);
+  if (abs(xBefore - x) > 10) {
+    xBefore = x;
+    return map(x, -255, 255, 5, 175);
+  } else {
+    return 300;
+  }
 }
 
 void setup() {
@@ -267,7 +270,6 @@ void setup() {
 void loop() {
   // checkApds();
   checkAxdl();
-
   breakLine(17, calculateStep());
 
   char str[20];
@@ -276,10 +278,18 @@ void loop() {
   printToLCDString(lcd, 1, 3, "      ");
   printToLCDString(lcd, 1, 3, str);
 
-  myservo.write(calculateServo());
+  if ((x > 0 && x < 250) || (x < 0 && x > -250)) {
+    pos = calculateServo();
+    if (pos != 300) {
+      myservo.write(pos);
+      Serial.println("Moving");
+    }else{
+      Serial.println("Not moving");
+    }
+  }
 
   // sprintf(str, "%d", calculateServo());
   // Serial.println(str);
 
-  delay(150);
+  delay(220);
 }
