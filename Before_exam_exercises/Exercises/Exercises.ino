@@ -14,13 +14,18 @@
 /**
  * @wiring
  * relayPin (2) => relay: pin "IN"
+ * ledPin (3) => led
  *
- * button: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (8) + pull down
- * resistor)
+ * button 1: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (8) + pull down resistor)
  *         X  X
  *         .  .
  *         3  4
  *
+ * 
+ * button 2: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (9) + pull down resistor)
+ *         X  X
+ *         .  .
+ *         3  4
  */
 
 #define PRINT_DELAY 1000
