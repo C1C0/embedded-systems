@@ -1,6 +1,6 @@
 {
-    "port": "COM9",
+    "port": "COM5",
     "board": "arduino:avr:uno",
-    "sketch": "Class_Exercise_3_sensor\\Class_Exercise_3_sensor.ino",
-    "programmer": "arduino:avrispmkii"
+    "programmer": "arduino:avrispmkii",
+    "sketch": "Before_exam_exercises\\Exercises\\Exercises.ino"
 }
