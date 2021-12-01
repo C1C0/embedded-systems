@@ -78,8 +78,8 @@ void setup() {
 }
 
 void loop() {
-  checkButton(&button1, &relay);
-  checkButton(&button2, &led);
+  checkButtonChangeDevState(&button1, &relay);
+  checkButtonChangeDevState(&button2, &led);
 
   delayedPrint();
 
@@ -92,19 +92,41 @@ void loop() {
  * https://www.arduino.cc/en/pmwiki.php?n=Tutorial/Debounce
  *
  */
-void checkButton(BUTTON *button, OUTPUT_DEVICE *device) {
+void checkButtonChangeDevState(BUTTON *button, OUTPUT_DEVICE *device) {
   char currentButtonState = digitalRead(button->pin);
 
-  // If the switch changed, due to noise or pressing:
-  if (currentButtonState != button->previousState) {
-    // reset the debouncing timer
+  checkButtonSetDebounce(button, &currentButtonState);
+  checkPressTimeOfButton(button, device, &currentButtonState);
+
+  // Save the button state
+  button->previousState = currentButtonState;
+}
+
+/**
+ * @brief If the switch changed, due to noise or pressing, reset the debouncing timer
+ * 
+ * @param button 
+ * @param currentButtonState 
+ */
+void checkButtonSetDebounce(BUTTON *button, char *currentButtonState){
+  if (*currentButtonState != button->previousState) {
     times.lastDebounceTime = millis();
   }
+}
 
+/**
+ * @brief check press tiem of the button and change state of specified output device
+ * 
+ * @param button 
+ * @param device 
+ * @param currentButtonState 
+ */
+void checkPressTimeOfButton(BUTTON *button, OUTPUT_DEVICE *device, char *currentButtonState){
+  // checks if the press time of the button is higher than debounce time psecified on the button
   if ((millis() - times.lastDebounceTime) > button->debounceDelay) {
     // check if button state has changed
-    if (currentButtonState != button->state) {
-      button->state = currentButtonState;
+    if (*currentButtonState != button->state) {
+      button->state = *currentButtonState;
 
       // only toggle the object state if the new button state is HIGH
       if (button->state == HIGH) {
@@ -112,9 +134,6 @@ void checkButton(BUTTON *button, OUTPUT_DEVICE *device) {
       }
     }
   }
-
-  // Save the button state
-  button->previousState = currentButtonState;
 }
 
 /**
