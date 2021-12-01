@@ -2,7 +2,8 @@
  * @file Exercises.ino
  * @author Kristian
  * @brief Make a program that can control a relay from the push of a button, and
- * prints the state of the relay every second on the serial monitor.
+ * prints the state of the relay every second on the serial monitor. Actually,
+ * second button controls LED
  * @version 0.1
  * @date 2021-12-01
  *
@@ -28,10 +29,13 @@
  * @brief Relay structure and state
  *
  */
-struct RELAY {
+struct OUTPUT_DEVICE {
   char pin;
   char state;
-} relay = {2, LOW};
+};
+
+struct OUTPUT_DEVICE relay = {2, HIGH};
+struct OUTPUT_DEVICE led = {3, HIGH};
 
 /**
  * @brief Button structure and states
@@ -42,7 +46,10 @@ struct BUTTON {
   char state;
   char previousState;
   unsigned long debounceDelay;
-} button = {8, LOW, LOW, 75};
+};
+
+struct BUTTON button1 = {8, LOW, LOW, 75};
+struct BUTTON button2 = {9, LOW, LOW, 50};
 
 /**
  * @brief Times variables
@@ -57,53 +64,62 @@ void setup() {
   Serial.begin(9600);
 
   pinMode(relay.pin, OUTPUT);
-  pinMode(button.pin, INPUT);
+  pinMode(led.pin, OUTPUT);
+  pinMode(button1.pin, INPUT);
+  pinMode(button2.pin, INPUT);
 
   digitalWrite(relay.pin, relay.state);
+  digitalWrite(led.pin, led.state);
 }
 
 void loop() {
-  checkButton();
+  checkButton(&button1, &relay);
+  checkButton(&button2, &led);
+
   delayedPrint();
+
   digitalWrite(relay.pin, relay.state);
+  digitalWrite(led.pin, led.state);
 }
 
 /**
- * @brief Part of the code taken from: https://www.arduino.cc/en/pmwiki.php?n=Tutorial/Debounce
- * 
+ * @brief Part of the code taken from:
+ * https://www.arduino.cc/en/pmwiki.php?n=Tutorial/Debounce
+ *
  */
-void checkButton() {
-  char currentButtonState = digitalRead(button.pin);
+void checkButton(BUTTON *button, OUTPUT_DEVICE *device) {
+  char currentButtonState = digitalRead(button->pin);
 
   // If the switch changed, due to noise or pressing:
-  if (currentButtonState != button.previousState) {
+  if (currentButtonState != button->previousState) {
     // reset the debouncing timer
     times.lastDebounceTime = millis();
   }
 
-  if ((millis() - times.lastDebounceTime) > button.debounceDelay) {
+  if ((millis() - times.lastDebounceTime) > button->debounceDelay) {
     // check if button state has changed
-    if (currentButtonState != button.state) {
-      button.state = currentButtonState;
+    if (currentButtonState != button->state) {
+      button->state = currentButtonState;
 
-      // only toggle the LED if the new button state is HIGH
-      if (button.state == HIGH) {
-        relay.state = !relay.state;
+      // only toggle the object state if the new button state is HIGH
+      if (button->state == HIGH) {
+        device->state = !device->state;
       }
     }
   }
 
   // Save the button state
-  button.previousState = currentButtonState;
+  button->previousState = currentButtonState;
 }
 
 /**
  * @brief Print relay state to Serial
- * 
+ *
  */
 void delayedPrint() {
   if ((millis() - times.lastReadingTime) > PRINT_DELAY) {
     times.lastReadingTime = millis();
     Serial.println(relay.state);
+    Serial.println(led.state);
   }
 }
