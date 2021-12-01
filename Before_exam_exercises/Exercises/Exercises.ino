@@ -26,6 +26,20 @@
  *         X  X
  *         .  .
  *         3  4
+ * 
+ * OLED Display SH1106 - display1: RES - 5, DC - 6, CS - 7
+ * 
+ * Medium Font:
+ *  ________________
+ * |       P2:H P3:L|
+ * |                |
+ * |                |
+ * |                |
+ * |                |
+ * |                |
+ * |                |
+ * |                |
+ *  ________________
  */
 
 #include <Arduino.h>
@@ -35,6 +49,7 @@
 #endif
 
 #define PRINT_DELAY 1000
+#define UI_PRINT_DELAY 500
 
 /**
  * @brief Relay structure and state
@@ -43,10 +58,11 @@
 struct OUTPUT_DEVICE {
   char pin;
   char state;
+  char uiPos[2];
 };
 
-struct OUTPUT_DEVICE relay = {2, HIGH};
-struct OUTPUT_DEVICE led = {3, HIGH};
+struct OUTPUT_DEVICE relay = {2, HIGH, {7, 0}};
+struct OUTPUT_DEVICE led = {3, HIGH, {12, 0}};
 
 /**
  * @brief Button structure and states
@@ -89,6 +105,8 @@ void setup() {
   digitalWrite(led.pin, led.state);
 
   setupDisplay(&display1, "Hello Stranger");
+  UIDisplayPrintOutputDeviceState(&display1, &relay);
+  UIDisplayPrintOutputDeviceState(&display1, &led);
 }
 
 void loop() {
@@ -99,6 +117,9 @@ void loop() {
 
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
+
+  UIUpdateOutputDev(&display1, &relay, &button1);
+  UIUpdateOutputDev(&display1, &led, &button2);
 }
 
 /**
@@ -163,6 +184,31 @@ void delayedPrint() {
 }
 
 /**
+ * @brief decides, when update UI
+ * 
+ * @param display 
+ * @param device 
+ * @param button 
+ */
+void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, OUTPUT_DEVICE *device, BUTTON *button){
+  if(button->previousState != button->state){
+    UIDisplayPrintOutputDeviceState(display, device);
+  }
+}
+
+/**
+ * @brief print state of SELECTED device
+ * 
+ * @param display 
+ * @param device 
+ */
+void UIDisplayPrintOutputDeviceState(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, OUTPUT_DEVICE *device){
+  char s[4];
+  sprintf(s, "P%d:%s", device->pin, device->state == 0 ? "L" : "H");
+  display->drawString(device->uiPos[0], device->uiPos[1], s);
+}
+
+/**
  * @brief Sets up chosen display
  * 
  */
@@ -171,7 +217,9 @@ void setupDisplay(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, char *setupMessa
   display->setPowerSave(0);
   display->setFont(u8x8_font_chroma48medium8_r);
 
-  displayTextToMiddle(display, setupMessage);  
+  displayTextToMiddle(display, setupMessage);
+  delay(1000);
+  display->clear();  
 }
 
 /**
