@@ -28,6 +28,12 @@
  *         3  4
  */
 
+#include <Arduino.h>
+#include <U8x8lib.h>
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+
 #define PRINT_DELAY 1000
 
 /**
@@ -65,6 +71,12 @@ struct TIMES {
   unsigned long lastReadingTime;
 } times = {0, 0};
 
+/**
+ * @brief SPI Display object
+ * 
+ */
+U8X8_SH1106_128X64_NONAME_4W_HW_SPI display1(/* cs=*/ 7, /* dc=*/ 6, /* reset=*/ 5);
+
 void setup() {
   Serial.begin(9600);
 
@@ -75,6 +87,8 @@ void setup() {
 
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
+
+  setupDisplay(&display1, "Hello Stranger");
 }
 
 void loop() {
@@ -146,4 +160,30 @@ void delayedPrint() {
     Serial.println(relay.state);
     Serial.println(led.state);
   }
+}
+
+/**
+ * @brief Sets up chosen display
+ * 
+ */
+void setupDisplay(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, char *setupMessage){
+  display->begin();
+  display->setPowerSave(0);
+  display->setFont(u8x8_font_chroma48medium8_r);
+
+  displayTextToMiddle(display, setupMessage);  
+}
+
+/**
+ * @brief Prints string to the middle of the screen
+ * 
+ * @param s 
+ */
+void displayTextToMiddle(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, char *s){
+  char sLen = strlen(s);
+
+  char row = display->getRows() / 2;
+  char col = display->getCols() / 2 - (sLen / 2);
+
+  display->drawString(col, row, s);
 }
