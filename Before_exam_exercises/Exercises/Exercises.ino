@@ -16,22 +16,24 @@
  * relayPin (2) => relay: pin "IN"
  * ledPin (3) => led
  *
- * button 1: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (8) + pull down resistor)
+ * button 1: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (8) + pull down
+ * resistor)
  *         X  X
  *         .  .
  *         3  4
  *
- * 
- * button 2: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (9) + pull down resistor)
+ *
+ * button 2: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (9) + pull down
+ * resistor)
  *         X  X
  *         .  .
  *         3  4
- * 
+ *
  * OLED Display SH1106 - display1: RES - 5, DC - 6, CS - 7
- * 
+ *
  * Medium Font:
  *  ________________
- * |       P2:H P3:L|
+ * |T:XX.XC P2:H 3:L|
  * |                |
  * |                |
  * |                |
@@ -61,8 +63,8 @@ struct OUTPUT_DEVICE {
   char uiPos[2];
 };
 
-struct OUTPUT_DEVICE relay = {2, HIGH, {7, 0}};
-struct OUTPUT_DEVICE led = {3, HIGH, {12, 0}};
+struct OUTPUT_DEVICE relay = {2, HIGH, {8, 0}};
+struct OUTPUT_DEVICE led = {3, HIGH, {13, 0}};
 
 /**
  * @brief Button structure and states
@@ -88,10 +90,22 @@ struct TIMES {
 } times = {0, 0};
 
 /**
- * @brief SPI Display object
- * 
+ * @brief Temperature meter
+ *
  */
-U8X8_SH1106_128X64_NONAME_4W_HW_SPI display1(/* cs=*/ 7, /* dc=*/ 6, /* reset=*/ 5);
+struct TEMP_METER {
+  char pin;
+  float value;
+  short int checkTimeMs;
+  unsigned long lastCheckTimeMS;
+} lm35 = {A0, 0, 2000, 0};
+
+/**
+ * @brief SPI Display object
+ *
+ */
+U8X8_SH1106_128X64_NONAME_4W_HW_SPI display1(/* cs=*/7, /* dc=*/6,
+                                             /* reset=*/5);
 
 void setup() {
   Serial.begin(9600);
@@ -100,13 +114,19 @@ void setup() {
   pinMode(led.pin, OUTPUT);
   pinMode(button1.pin, INPUT);
   pinMode(button2.pin, INPUT);
+  pinMode(lm35.pin, INPUT);
 
+  // Set initial state of OUTPUT_DEVICE
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
 
   setupDisplay(&display1, "Hello Stranger");
-  UIDisplayPrintOutputDeviceState(&display1, &relay);
-  UIDisplayPrintOutputDeviceState(&display1, &led);
+
+  // Initial print of pin state
+  UIDisplayPrintOutputDeviceState(&display1, &relay, 1);
+  UIDisplayPrintOutputDeviceState(&display1, &led, 0);
+
+  // analogReference(INTERNAL);
 }
 
 void loop() {
@@ -118,8 +138,10 @@ void loop() {
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
 
-  UIUpdateOutputDev(&display1, &relay, &button1);
-  UIUpdateOutputDev(&display1, &led, &button2);
+  UIUpdateOutputDev(&display1, &relay, &button1, 1);
+  UIUpdateOutputDev(&display1, &led, &button2, 0);
+
+  UIUpdateOutputTemp(&display1, &lm35);
 }
 
 /**
@@ -138,26 +160,30 @@ void checkButtonChangeDevState(BUTTON *button, OUTPUT_DEVICE *device) {
 }
 
 /**
- * @brief If the switch changed, due to noise or pressing, reset the debouncing timer
- * 
- * @param button 
- * @param currentButtonState 
+ * @brief If the switch changed, due to noise or pressing, reset the debouncing
+ * timer
+ *
+ * @param button
+ * @param currentButtonState
  */
-void checkButtonSetDebounce(BUTTON *button, char *currentButtonState){
+void checkButtonSetDebounce(BUTTON *button, char *currentButtonState) {
   if (*currentButtonState != button->previousState) {
     times.lastDebounceTime = millis();
   }
 }
 
 /**
- * @brief check press tiem of the button and change state of specified output device
- * 
- * @param button 
- * @param device 
- * @param currentButtonState 
+ * @brief check press tiem of the button and change state of specified output
+ * device
+ *
+ * @param button
+ * @param device
+ * @param currentButtonState
  */
-void checkPressTimeOfButton(BUTTON *button, OUTPUT_DEVICE *device, char *currentButtonState){
-  // checks if the press time of the button is higher than debounce time psecified on the button
+void checkPressTimeOfButton(BUTTON *button, OUTPUT_DEVICE *device,
+                            char *currentButtonState) {
+  // checks if the press time of the button is higher than debounce time
+  // psecified on the button
   if ((millis() - times.lastDebounceTime) > button->debounceDelay) {
     // check if button state has changed
     if (*currentButtonState != button->state) {
@@ -185,49 +211,94 @@ void delayedPrint() {
 
 /**
  * @brief decides, when update UI
- * 
- * @param display 
- * @param device 
- * @param button 
+ *
+ * @param display
+ * @param device
+ * @param button
  */
-void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, OUTPUT_DEVICE *device, BUTTON *button){
-  if(button->previousState != button->state){
-    UIDisplayPrintOutputDeviceState(display, device);
+void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                       OUTPUT_DEVICE *device, BUTTON *button, char printP) {
+  if (button->previousState != button->state) {
+    UIDisplayPrintOutputDeviceState(display, device, printP);
+  }
+}
+
+/**
+ * @brief Check temperature every X seconds - specified in TEMP_METER structure
+ *
+ * @param display
+ * @param temp
+ */
+void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                        TEMP_METER *temp) {
+  if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
+    char *tempS = "T:    C";
+    char realstr[8];
+
+    temp->lastCheckTimeMS = millis();
+
+    // read the value from the PIN,
+    // convert this value to voltage (5000 / 1024.0),
+    // and then to temperature (/10)
+    temp->value = analogRead(lm35.pin) * (5000 / 1024.0F) / 10;
+    Serial.println("TEST");
+    Serial.println(temp->value);
+    
+    dtostrf(temp->value, -3, 1, tempS+2);
+    sprintf(realstr, "%s%c", tempS, 'C');
+
+    Serial.println(tempS);
+    Serial.println(realstr);
+    Serial.println("ahoj");
+
+    display->drawString(0, 0, realstr);
+
   }
 }
 
 /**
  * @brief print state of SELECTED device
- * 
- * @param display 
- * @param device 
+ *
+ * @param display
+ * @param device
  */
-void UIDisplayPrintOutputDeviceState(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, OUTPUT_DEVICE *device){
-  char s[4];
-  sprintf(s, "P%d:%s", device->pin, device->state == 0 ? "L" : "H");
+void UIDisplayPrintOutputDeviceState(
+    U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, OUTPUT_DEVICE *device,
+    char printP) {
+
+  char s[5];
+
+  if (printP == 1) {
+    sprintf(s, "P%d:%c", device->pin, device->state == 0 ? 'L' : 'H');
+  } else {
+    sprintf(s, "%d:%c", device->pin, device->state == 0 ? 'L' : 'H');
+  }
+
   display->drawString(device->uiPos[0], device->uiPos[1], s);
 }
 
 /**
  * @brief Sets up chosen display
- * 
+ *
  */
-void setupDisplay(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, char *setupMessage){
+void setupDisplay(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                  char *setupMessage) {
   display->begin();
   display->setPowerSave(0);
   display->setFont(u8x8_font_chroma48medium8_r);
 
   displayTextToMiddle(display, setupMessage);
   delay(1000);
-  display->clear();  
+  display->clear();
 }
 
 /**
  * @brief Prints string to the middle of the screen
- * 
- * @param s 
+ *
+ * @param s
  */
-void displayTextToMiddle(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, char *s){
+void displayTextToMiddle(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                         char *s) {
   char sLen = strlen(s);
 
   char row = display->getRows() / 2;
