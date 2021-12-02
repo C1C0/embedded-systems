@@ -52,6 +52,7 @@
 
 #define PRINT_DELAY 1000
 #define UI_PRINT_DELAY 500
+#define MAX_UP_TEMP 30.0
 
 /**
  * @brief Relay structure and state
@@ -98,7 +99,7 @@ struct TEMP_METER {
   float value;
   short int checkTimeMs;
   unsigned long lastCheckTimeMS;
-} lm35 = {A0, 0, 2000, 0};
+} lm35 = {A0, 0, 500, 0};
 
 /**
  * @brief SPI Display object
@@ -128,18 +129,15 @@ void setup() {
 }
 
 void loop() {
-  checkButtonChangeDevState(&button1, &relay);
-  checkButtonChangeDevState(&button2, &led);
+  checkButtonChangeDevState(&display1, &button1, &relay, 1);
+  checkButtonChangeDevState(&display1, &button2, &led, 0);
+
+  delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay);
 
   delayedPrint();
 
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
-
-  UIUpdateOutputDev(&display1, &relay, &button1, 1);
-  UIUpdateOutputDev(&display1, &led, &button2, 0);
-
-  UIUpdateOutputTemp(&display1, &lm35);
 }
 
 /**
@@ -147,7 +145,9 @@ void loop() {
  * https://www.arduino.cc/en/pmwiki.php?n=Tutorial/Debounce
  *
  */
-void checkButtonChangeDevState(BUTTON *button, OUTPUT_DEVICE *device) {
+void checkButtonChangeDevState(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                               BUTTON *button, OUTPUT_DEVICE *device,
+                               char printP) {
   char currentButtonState = digitalRead(button->pin);
 
   checkButtonSetDebounce(button, &currentButtonState);
@@ -155,6 +155,8 @@ void checkButtonChangeDevState(BUTTON *button, OUTPUT_DEVICE *device) {
 
   // Save the button state
   button->previousState = currentButtonState;
+
+  UIUpdateOutputDev(display, device, button, printP);
 }
 
 /**
@@ -221,6 +223,14 @@ void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
   }
 }
 
+void delayedTempCheck(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                      TEMP_METER *temp, float max_up_temp, OUTPUT_DEVICE *device) {
+  if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
+    checkIfTurnOnFan(temp, max_up_temp, device);
+    UIUpdateOutputTemp(display, temp);
+  }
+}
+
 /**
  * @brief Check temperature every X seconds - specified in TEMP_METER structure
  *
@@ -229,25 +239,48 @@ void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
  */
 void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
                         TEMP_METER *temp) {
-  if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
-    char tempS[8] = "T:";
+  char tempS[8] = "T:";
 
-    temp->lastCheckTimeMS = millis();
+  temp->lastCheckTimeMS = millis();
 
-    // read the value from the PIN,
-    // convert this value to voltage (5000 / 1024.0),
-    // and then to temperature (/10)
-    temp->value = analogRead(lm35.pin) * (5000 / 1024.0F) / 10;
+  checkTemp(temp);
 
-    // Convert float value into string    
-    dtostrf(temp->value, -3, 1, tempS+2);
+  // Convert float value into string
+  dtostrf(temp->value, -3, 1, tempS + 2);
 
-    // Append C
-    strcat(tempS, "C");
+  // Append C
+  strcat(tempS, "C");
 
-    // Draw UI
-    display->drawString(0, 0, tempS);
+  // Draw UI
+  display->drawString(0, 0, tempS);
+}
+
+/**
+ * @brief Checks if value of temperature is higher than specified value
+ * If so, changes state of device
+ *
+ * @param temp
+ * @param device
+ */
+void checkIfTurnOnFan(TEMP_METER *temp, float max_top_temp,
+                      OUTPUT_DEVICE *device) {
+  if (temp->value > max_top_temp) {
+    device->state = HIGH;
+  } else {
+    device->state = LOW;
   }
+}
+
+/**
+ * @brief Get the Temperature of temp. meter
+ *
+ * @param temp
+ */
+void checkTemp(TEMP_METER *temp) {
+  // read the value from the PIN,
+  // convert this value to voltage (5000 / 1024.0),
+  // and then to temperature (/10)
+  temp->value = analogRead(lm35.pin) * (5000 / 1024.0F) / 10;
 }
 
 /**
