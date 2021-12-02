@@ -125,8 +125,6 @@ void setup() {
   // Initial print of pin state
   UIDisplayPrintOutputDeviceState(&display1, &relay, 1);
   UIDisplayPrintOutputDeviceState(&display1, &led, 0);
-
-  // analogReference(INTERNAL);
 }
 
 void loop() {
@@ -232,8 +230,7 @@ void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
 void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
                         TEMP_METER *temp) {
   if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
-    char *tempS = "T:    C";
-    char realstr[8];
+    char tempS[8] = "T:";
 
     temp->lastCheckTimeMS = millis();
 
@@ -241,18 +238,15 @@ void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
     // convert this value to voltage (5000 / 1024.0),
     // and then to temperature (/10)
     temp->value = analogRead(lm35.pin) * (5000 / 1024.0F) / 10;
-    Serial.println("TEST");
-    Serial.println(temp->value);
-    
+
+    // Convert float value into string    
     dtostrf(temp->value, -3, 1, tempS+2);
-    sprintf(realstr, "%s%c", tempS, 'C');
 
-    Serial.println(tempS);
-    Serial.println(realstr);
-    Serial.println("ahoj");
+    // Append C
+    strcat(tempS, "C");
 
-    display->drawString(0, 0, realstr);
-
+    // Draw UI
+    display->drawString(0, 0, tempS);
   }
 }
 
