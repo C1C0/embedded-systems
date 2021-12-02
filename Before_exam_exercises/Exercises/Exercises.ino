@@ -15,19 +15,18 @@
  * @wiring
  * relayPin (2) => relay: pin "IN"
  * ledPin (3) => led
+ * lm35 (A0) => LM35 temp.
  *
- * button 1: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (8) + pull down
- * resistor)
- *         X  X
- *         .  .
- *         3  4
+ * button 1: 1  2 - Legs taken: 1 (c: VCC),
+ *           X  X               2 (c: buttonPin (8) + pull down resistor)
+ *           .  .
+ *           3  4
  *
  *
- * button 2: 1  2 - Legs taken: 1 (c: VCC), 2 (c: buttonPin (9) + pull down
- * resistor)
- *         X  X
- *         .  .
- *         3  4
+ * button 2: 1  2 - Legs taken: 1 (c: VCC),
+ *           X  X               2 (c: buttonPin (9) + pull down resistor)
+ *           .  .
+ *           3  4
  *
  * OLED Display SH1106 - display1: RES - 5, DC - 6, CS - 7
  *
@@ -42,8 +41,10 @@
  * |                |
  * |                |
  *  ________________
+ *
  */
 
+#include <stdbool.h>
 #include <Arduino.h>
 #include <U8x8lib.h>
 #ifdef U8X8_HAVE_HW_SPI
@@ -132,7 +133,7 @@ void loop() {
   checkButtonChangeDevState(&display1, &button1, &relay, 1);
   checkButtonChangeDevState(&display1, &button2, &led, 0);
 
-  delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay);
+  delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay, 1);
 
   delayedPrint();
 
@@ -156,7 +157,9 @@ void checkButtonChangeDevState(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
   // Save the button state
   button->previousState = currentButtonState;
 
-  UIUpdateOutputDev(display, device, button, printP);
+  if (button->previousState != button->state) {
+    UIDisplayPrintOutputDeviceState(display, device, printP);
+  }
 }
 
 /**
@@ -209,24 +212,11 @@ void delayedPrint() {
   }
 }
 
-/**
- * @brief decides, when update UI
- *
- * @param display
- * @param device
- * @param button
- */
-void UIUpdateOutputDev(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
-                       OUTPUT_DEVICE *device, BUTTON *button, char printP) {
-  if (button->previousState != button->state) {
-    UIDisplayPrintOutputDeviceState(display, device, printP);
-  }
-}
-
 void delayedTempCheck(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
-                      TEMP_METER *temp, float max_up_temp, OUTPUT_DEVICE *device) {
+                      TEMP_METER *temp, float max_up_temp,
+                      OUTPUT_DEVICE *device, char printP) {
   if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
-    checkIfTurnOnFan(temp, max_up_temp, device);
+    checkIfTurnOnFan(display, temp, max_up_temp, device, printP);
     UIUpdateOutputTemp(display, temp);
   }
 }
@@ -262,12 +252,18 @@ void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
  * @param temp
  * @param device
  */
-void checkIfTurnOnFan(TEMP_METER *temp, float max_top_temp,
-                      OUTPUT_DEVICE *device) {
+void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, TEMP_METER *temp, float max_top_temp,
+                      OUTPUT_DEVICE *device, char printP) {
+  char prevState = device->state;
+
   if (temp->value > max_top_temp) {
     device->state = HIGH;
   } else {
     device->state = LOW;
+  }
+
+  if (prevState != device->state) {
+    UIDisplayPrintOutputDeviceState(display, device, printP);
   }
 }
 
