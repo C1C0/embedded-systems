@@ -14,7 +14,8 @@
 /**
  * @wiring
  * relayPin (2) => relay: pin "IN"
- * ledPin (3) => led
+ * ledPin (4) => led
+ * breathingLED (3) => led
  * lm35 (A0) => LM35 temp.
  *
  * button 1: 1  2 - Legs taken: 1 (c: VCC),
@@ -32,14 +33,14 @@
  *
  * Medium Font:
  *  ________________
- * |T:XX.XC P2:H 3:L|
+ * |T:XX.XC PX:H X:L|
  * |                |
  * |                |
  * |                |
  * |                |
  * |                |
  * |                |
- * |                |
+ * |PX:FAST         |
  *  ________________
  *
  */
@@ -66,7 +67,8 @@ struct OUTPUT_DEVICE {
 };
 
 struct OUTPUT_DEVICE relay = {2, HIGH, {8, 0}};
-struct OUTPUT_DEVICE led = {3, HIGH, {13, 0}};
+struct OUTPUT_DEVICE breathingLed = {3, HIGH, {8, 0}};
+struct OUTPUT_DEVICE led = {4, HIGH, {13, 0}};
 
 /**
  * @brief Button structure and states
@@ -134,6 +136,9 @@ void loop() {
   checkButtonChangeDevState(&display1, &button2, &led, 0);
 
   delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay, 1);
+
+  // TODO
+  checkBreathingLED(&breathingLed);
 
   delayedPrint();
 
@@ -252,7 +257,8 @@ void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
  * @param temp
  * @param device
  */
-void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, TEMP_METER *temp, float max_top_temp,
+void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
+                      TEMP_METER *temp, float max_top_temp,
                       OUTPUT_DEVICE *device, char printP) {
   char prevState = device->state;
 
@@ -265,6 +271,15 @@ void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display, TEMP_METER *
   if (prevState != device->state) {
     UIDisplayPrintOutputDeviceState(display, device, printP);
   }
+}
+
+/**
+ * @brief Performs breathing on output device
+ * 
+ * @param PWMLed 
+ */
+void checkBreathingLED(OUTPUT_DEVICE *PWMLed) {
+  //TODO:
 }
 
 /**
