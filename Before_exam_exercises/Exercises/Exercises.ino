@@ -48,35 +48,68 @@
 #include <stdbool.h>
 #include <Arduino.h>
 #include <U8x8lib.h>
+
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
 
+/**
+ * @brief Delay for function delayedPrint()
+ */
 #define PRINT_DELAY 1000
-#define UI_PRINT_DELAY 500
+
+/**
+ * @brief Max upper temperature for systems operations
+ */
 #define MAX_UP_TEMP 30.0
+
+// Other constants
 #define SLOW_BREATH "SLOW"
 #define FAST_BREATH "FAST"
 
 /**
  * @brief Relay structure and state
- *
  */
 typedef struct OUTPUT_DEVICE {
-  char pin;
-  char state;
-  char uiPos[2];
+  byte pin : 4;
+  byte state : 1;
+  byte uiPos[2];
 } OUTPUT_DEVICE;
 
 OUTPUT_DEVICE relay = {2, HIGH, {8, 0}};
 OUTPUT_DEVICE led = {4, HIGH, {13, 0}};
 
+/**
+ * @brief LED which should has breathing function
+ *
+ */
 typedef struct BREATHING_LED {
   OUTPUT_DEVICE device;
 
-  int smoothnessPts;
-  int actualSmoothPt;
+  /**
+   * @brief Expected value range: <0; 255>
+   *        Higher for faster blinking
+   */
+  short int smoothnessPts;
+
+  /**
+   * @brief Actual point of smoothness
+   *        Represents actual brightness of LED at single moment
+   */
+  short int actualSmoothPt;
+
+  /**
+   * @brief delay between each state change
+   *        does not change only speed but also smoothness
+   *        of transitions
+   *        Value range: <0;255>, recommended: 5
+   */
   byte delay;
+
+  /**
+   * @brief Preferebly used to assigned millis() function value
+   *        for further comparison
+   */
   unsigned long lastCheckTimeMS;
 } BREATHING_LED;
 
@@ -84,37 +117,66 @@ BREATHING_LED breathingLed = {{3, HIGH, {0, 8}}, 255, 0, 5, 0};
 
 /**
  * @brief Button structure and states
- *
  */
 typedef struct BUTTON {
-  char pin;
-  char state;
-  char previousState;
-  unsigned long debounceDelay;
+  byte pin : 4;
+  byte state : 1;
+
+  /**
+   * @brief Used for comparison to "state"
+   */
+  byte previousState : 1;
+
+  /**
+   * @brief Used for delaying swithing of button
+   *        if flickers - used higher number
+   *        range: (0; 128)
+   */
+  byte debounceDelay : 7;
+
+  /**
+   * @brief Preferebly used to assigned millis() function value
+   *        for further comparison
+   */
+  unsigned long lastDebounceTimeMS;
 } BUTTON;
 
-BUTTON button1 = {8, LOW, LOW, 75};
-BUTTON button2 = {9, LOW, LOW, 50};
+BUTTON button1 = {8, LOW, LOW, 75, 0};
+BUTTON button2 = {9, LOW, LOW, 50, 0};
 
 /**
  * @brief Times variables
- *
  */
 typedef struct TIMES {
-  unsigned long lastDebounceTime;
+  /**
+   * @brief Preferebly used to assigned millis() function value
+   *        for further comparison
+   */
   unsigned long lastReadingTime;
 } TIMES;
 
-TIMES times = {0, 0};
+TIMES times = {0};
 
 /**
  * @brief Temperature meter
- *
  */
 typedef struct TEMP_METER {
-  char pin;
+  byte pin : 4;
+
+  /**
+   * @brief last measured value should be stored here
+   */
   float value;
-  short int checkTimeMs;
+
+  /**
+   * @brief How often to check the temperature of specified meter
+   */
+  unsigned int checkTimeMs;
+
+  /**
+   * @brief Preferebly used to assigned millis() function value
+   *        for further comparison
+   */
   unsigned long lastCheckTimeMS;
 } TEMP_METER;
 
@@ -122,13 +184,14 @@ TEMP_METER lm35 = {A0, 0, 500, 0};
 
 /**
  * @brief SPI Display object
- *
  */
 U8X8_SH1106_128X64_NONAME_4W_HW_SPI display1(/* cs=*/7, /* dc=*/6,
                                              /* reset=*/5);
 
 void setup() {
   Serial.begin(9600);
+
+  setupDisplay(&display1, "Hello Stranger");
 
   pinMode(relay.pin, OUTPUT);
   pinMode(led.pin, OUTPUT);
@@ -139,8 +202,6 @@ void setup() {
   // Set initial state of OUTPUT_DEVICE
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
-
-  setupDisplay(&display1, "Hello Stranger");
 
   // Initial print of pin state
   UIDisplayPrintOutputDeviceState(&display1, &relay, 1);
@@ -157,6 +218,14 @@ void loop() {
 
   // delayedPrint();
 
+  assignStates();
+}
+
+/**
+ * @brief Assing states to of specified devices
+ * 
+ */
+void assignStates() {
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
 }
@@ -191,7 +260,7 @@ void checkButtonChangeDevState(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
  */
 void checkButtonSetDebounce(BUTTON *button, char *currentButtonState) {
   if (*currentButtonState != button->previousState) {
-    times.lastDebounceTime = millis();
+    button->lastDebounceTimeMS = millis();
   }
 }
 
@@ -207,7 +276,7 @@ void checkPressTimeOfButton(BUTTON *button, OUTPUT_DEVICE *device,
                             char *currentButtonState) {
   // checks if the press time of the button is higher than debounce time
   // psecified on the button
-  if ((millis() - times.lastDebounceTime) > button->debounceDelay) {
+  if ((millis() - button->lastDebounceTimeMS) > button->debounceDelay) {
     // check if button state has changed
     if (*currentButtonState != button->state) {
       button->state = *currentButtonState;
@@ -289,7 +358,6 @@ void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
 
   if (prevState != device->state) {
     UIDisplayPrintOutputDeviceState(display, device, printP);
-    setPWMLedBreathingSpeed(SLOW_BREATH, PWMLed);
   }
 }
 
@@ -310,7 +378,7 @@ void PWMLEDBreathe(BREATHING_LED *PWMLed) {
 
     // Performs the actual brightness of LED
     float pwm_val = 255.0 * (1.0 - abs((2.0 * ((float)PWMLed->actualSmoothPt /
-                                               PWMLed->smoothnessPts)) -
+                                               (float)PWMLed->smoothnessPts)) -
                                        1.0));
 
     analogWrite(PWMLed->device.pin, int(pwm_val));
@@ -325,12 +393,11 @@ void PWMLEDBreathe(BREATHING_LED *PWMLed) {
  */
 void setPWMLedBreathingSpeed(char *speed, BREATHING_LED *PWMLed) {
   if (strcmp(speed, "FAST")) {
-
-    PWMLed->smoothnessPts = 255;
+    PWMLed->smoothnessPts = 100;
   }
 
   if (strcmp(speed, "SLOW")) {
-    PWMLed->smoothnessPts = 50;
+    PWMLed->smoothnessPts = 25;
   }
 }
 
