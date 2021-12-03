@@ -60,49 +60,63 @@
  * @brief Relay structure and state
  *
  */
-struct OUTPUT_DEVICE {
+typedef struct OUTPUT_DEVICE {
   char pin;
   char state;
   char uiPos[2];
-};
+} OUTPUT_DEVICE;
 
-struct OUTPUT_DEVICE relay = {2, HIGH, {8, 0}};
-struct OUTPUT_DEVICE breathingLed = {3, HIGH, {8, 0}};
-struct OUTPUT_DEVICE led = {4, HIGH, {13, 0}};
+OUTPUT_DEVICE relay = {2, HIGH, {8, 0}};
+OUTPUT_DEVICE led = {4, HIGH, {13, 0}};
+
+typedef struct BREATHING_LED {
+  OUTPUT_DEVICE device;
+
+  int smoothnessPts;
+  int actualSmoothPt;
+  byte delay;
+  unsigned long lastCheckTimeMS;
+} BREATHING_LED;
+
+BREATHING_LED breathingLed = {{3, HIGH, {0, 8}}, 255, 0, 5, 0};
 
 /**
  * @brief Button structure and states
  *
  */
-struct BUTTON {
+typedef struct BUTTON {
   char pin;
   char state;
   char previousState;
   unsigned long debounceDelay;
-};
+} BUTTON;
 
-struct BUTTON button1 = {8, LOW, LOW, 75};
-struct BUTTON button2 = {9, LOW, LOW, 50};
+BUTTON button1 = {8, LOW, LOW, 75};
+BUTTON button2 = {9, LOW, LOW, 50};
 
 /**
  * @brief Times variables
  *
  */
-struct TIMES {
+typedef struct TIMES {
   unsigned long lastDebounceTime;
   unsigned long lastReadingTime;
-} times = {0, 0};
+} TIMES;
+
+TIMES times = {0, 0};
 
 /**
  * @brief Temperature meter
  *
  */
-struct TEMP_METER {
+typedef struct TEMP_METER {
   char pin;
   float value;
   short int checkTimeMs;
   unsigned long lastCheckTimeMS;
-} lm35 = {A0, 0, 500, 0};
+} TEMP_METER;
+
+TEMP_METER lm35 = {A0, 0, 500, 0};
 
 /**
  * @brief SPI Display object
@@ -140,7 +154,7 @@ void loop() {
   // TODO
   checkBreathingLED(&breathingLed);
 
-  delayedPrint();
+  // delayedPrint();
 
   digitalWrite(relay.pin, relay.state);
   digitalWrite(led.pin, led.state);
