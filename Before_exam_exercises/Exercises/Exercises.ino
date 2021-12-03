@@ -55,6 +55,8 @@
 #define PRINT_DELAY 1000
 #define UI_PRINT_DELAY 500
 #define MAX_UP_TEMP 30.0
+#define SLOW_BREATH "SLOW"
+#define FAST_BREATH "FAST"
 
 /**
  * @brief Relay structure and state
@@ -149,10 +151,9 @@ void loop() {
   checkButtonChangeDevState(&display1, &button1, &relay, 1);
   checkButtonChangeDevState(&display1, &button2, &led, 0);
 
-  delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay, 1);
+  delayedTempCheck(&display1, &lm35, MAX_UP_TEMP, &relay, &breathingLed, 1);
 
-  // TODO
-  checkBreathingLED(&breathingLed);
+  PWMLEDBreathe(&breathingLed);
 
   // delayedPrint();
 
@@ -233,9 +234,10 @@ void delayedPrint() {
 
 void delayedTempCheck(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
                       TEMP_METER *temp, float max_up_temp,
-                      OUTPUT_DEVICE *device, char printP) {
+                      OUTPUT_DEVICE *device, BREATHING_LED *PWMLed,
+                      char printP) {
   if ((millis() - temp->lastCheckTimeMS) > temp->checkTimeMs) {
-    checkIfTurnOnFan(display, temp, max_up_temp, device, printP);
+    checkIfTurnOnFan(display, temp, max_up_temp, device, PWMLed, printP);
     UIUpdateOutputTemp(display, temp);
   }
 }
@@ -273,27 +275,63 @@ void UIUpdateOutputTemp(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
  */
 void checkIfTurnOnFan(U8X8_SH1106_128X64_NONAME_4W_HW_SPI *display,
                       TEMP_METER *temp, float max_top_temp,
-                      OUTPUT_DEVICE *device, char printP) {
+                      OUTPUT_DEVICE *device, BREATHING_LED *PWMLed,
+                      char printP) {
   char prevState = device->state;
 
   if (temp->value > max_top_temp) {
     device->state = HIGH;
+    setPWMLedBreathingSpeed(FAST_BREATH, PWMLed);
   } else {
     device->state = LOW;
+    setPWMLedBreathingSpeed(SLOW_BREATH, PWMLed);
   }
 
   if (prevState != device->state) {
     UIDisplayPrintOutputDeviceState(display, device, printP);
+    setPWMLedBreathingSpeed(SLOW_BREATH, PWMLed);
   }
 }
 
 /**
  * @brief Performs breathing on output device
- * 
- * @param PWMLed 
+ *
+ * @param PWMLed
  */
-void checkBreathingLED(OUTPUT_DEVICE *PWMLed) {
-  //TODO:
+void PWMLEDBreathe(BREATHING_LED *PWMLed) {
+  if ((millis() - PWMLed->lastCheckTimeMS) > PWMLed->delay) {
+    // Sets the actual chekcing time for delay
+    PWMLed->lastCheckTimeMS = millis();
+    PWMLed->actualSmoothPt++;
+
+    if (PWMLed->actualSmoothPt > PWMLed->smoothnessPts) {
+      PWMLed->actualSmoothPt = 0;
+    }
+
+    // Performs the actual brightness of LED
+    float pwm_val = 255.0 * (1.0 - abs((2.0 * ((float)PWMLed->actualSmoothPt /
+                                               PWMLed->smoothnessPts)) -
+                                       1.0));
+
+    analogWrite(PWMLed->device.pin, int(pwm_val));
+  }
+}
+
+/**
+ * @brief On selected BREATHING_LED sets the speed of breathing
+ *
+ * @param speed
+ * @param PWMLed
+ */
+void setPWMLedBreathingSpeed(char *speed, BREATHING_LED *PWMLed) {
+  if (strcmp(speed, "FAST")) {
+
+    PWMLed->smoothnessPts = 255;
+  }
+
+  if (strcmp(speed, "SLOW")) {
+    PWMLed->smoothnessPts = 50;
+  }
 }
 
 /**
