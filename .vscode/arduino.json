@@ -2,6 +2,6 @@
     "port": "COM5",
     "board": "arduino:avr:uno",
     "programmer": "arduino:avrispmkii",
-    "sketch": "Before_exam_exercises\\Exercises\\Exercises.ino",
+    "sketch": "Before_exam_exercises_2\\Before_exam_exercises_2.ino",
     "output": "../ArduinoOutput"
 }
