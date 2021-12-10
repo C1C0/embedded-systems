@@ -26,7 +26,14 @@
  * @wiring Trigger Pin: 2, Echo Pin: 3
  *
  */
-SENSOR hcsr04 = {2, 3, 250, 0};
+SENSOR hcsr04 = {2, 3, 1600, 0, 0};
+
+/**
+ * @brief 
+ * @wiring IN Pin: 4
+ * 
+ */
+OUTPUT_DEVICE relay = {4, HIGH, {0, 0}};
 
 int distance = 0;
 unsigned int time = 0;
@@ -35,8 +42,17 @@ void setup() {
   Serial.begin(9600);
 
   setupSensor(&hcsr04);
+  pinMode(relay.pin, OUTPUT);
 }
 
 void loop() {
-  measureDistance(&hcsr04);
+  measureDistance(&hcsr04, true);
+
+  // if(hcsr04.distance < 5){
+  //   relay.state = LOW;
+  // }else{
+  //   relay.state = HIGH;
+  // }
+
+  // digitalWrite(relay.pin, relay.state);
 }

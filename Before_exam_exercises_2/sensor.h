@@ -16,6 +16,6 @@
 
 // extern void setupSensor(SENSOR *);
 void setupSensor(SENSOR *);
-void measureDistance(SENSOR *);
+void measureDistance(SENSOR *, bool enablePrinting);
 
 #endif

@@ -10,7 +10,13 @@
  */
 
 #include <Arduino.h>
+#include <stdbool.h>
 #include "structures.h"
+
+void _initReading(SENSOR *);
+void _switchTrigAndGetMicro(SENSOR *, int state, int switchTo);
+void _getValue(SENSOR *, bool enablePrinting);
+void _switchInitLevel(SENSOR *, int switchTo);
 
 /**
  * @brief Sets the pins of sensor to correct states
@@ -27,7 +33,7 @@ void setupSensor(SENSOR *sensor) {
  *
  * @param sensor
  */
-void measureDistance(SENSOR *sensor) {
+void measureDistance(SENSOR *sensor, bool enablePrinting) {
   // Reading time perfomed only after specified reading time
   if ((millis() - sensor->lastReading) > sensor->readingTime) {
 
@@ -35,7 +41,7 @@ void measureDistance(SENSOR *sensor) {
     if (sensor->newInit) {
       _initReading(sensor);
     } else {
-      _getValue(sensor);
+      _getValue(sensor, enablePrinting);
     }
   }
 }
@@ -54,16 +60,22 @@ void measureDistance(SENSOR *sensor) {
  * @param sensor
  */
 void _initReading(SENSOR *sensor) {
-  _switchTrigAndGetMicro(sensor, LOW);
+  if (sensor->initLevel == 0) {
+    _switchTrigAndGetMicro(sensor, LOW, 1);
+  }
 
   // Clear the trigPin by setting it LOW:
   if ((micros() - sensor->trigLastChange) > 5) {
-    _switchTrigAndGetMicro(sensor, HIGH);
+    if (sensor->initLevel == 1) {
+      _switchTrigAndGetMicro(sensor, HIGH, 2);
+    }
 
-    // Trigger the sensor by setting the trigPin high for 10 microseconds:
-    if ((micros() - sensor->trigLastChange) > 10) {
+    // Trigger the sensor by setting the trigPin high for 10 microseconds:;
+    if ((micros() - sensor->trigLastChange) > 10 && sensor->initLevel == 2) {
       digitalWrite(sensor->trigPin, LOW);
+      sensor->initLevel = 0;
       sensor->newInit = 0;
+      sensor->trigLastChange = micros();
     }
   }
 }
@@ -76,27 +88,38 @@ void _initReading(SENSOR *sensor) {
  * @param sensor
  * @param state
  */
-void _switchTrigAndGetMicro(SENSOR *sensor, byte state) {
-  if (digitalRead(sensor->trigPin) != state) {
+void _switchTrigAndGetMicro(SENSOR *sensor, int state, int switchTo) {
+  if (digitalRead(sensor->trigPin) != state || sensor->initLevel != switchTo) {
     digitalWrite(sensor->trigPin, state);
+    _switchInitLevel(sensor, switchTo);
     sensor->trigLastChange = micros();
   }
 }
 
 /**
- * @brief measures value (distance) with the sensor and states newInit state to 1
- * 
+ * @brief measures value (distance) with the sensor and states newInit state to
+ * 1
+ *
  * @doc
  * distance = [HIGH level time] * [cm/micros] / 2
- * 
- * @param sensor 
+ *
+ * @param sensor
  */
-void _getValue(SENSOR *sensor) {
-  sensor->lastReading = millis();
-  sensor->newInit = 1;
-
+void _getValue(SENSOR *sensor, bool enablePrinting = false) {
   // Read the echoPin, pulseIn() returns the duration (length of the pulse)
   // in microseconds
   sensor->duration = pulseIn(sensor->echoPin, HIGH);
   sensor->distance = sensor->duration * 0.034 / 2;
+
+  if (enablePrinting) {
+    Serial.print(sensor->distance);
+    Serial.println(" cm");
+  }
+
+  sensor->lastReading = millis();
+  sensor->newInit = 1;
+}
+
+void _switchInitLevel(SENSOR *sensor, int switchTo) {
+  sensor->initLevel = switchTo;
 }
