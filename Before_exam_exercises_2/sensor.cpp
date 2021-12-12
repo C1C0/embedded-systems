@@ -38,7 +38,7 @@ void measureDistance(SENSOR *sensor, bool enablePrinting) {
   if ((millis() - sensor->lastReading) > sensor->readingTime) {
 
     // SENSOR has two states: Initializing and Pulsing (reading)
-    if (sensor->newInit) {
+    if (sensor->initLevel < 3) {
       _initReading(sensor);
     } else {
       _getValue(sensor, enablePrinting);
@@ -73,9 +73,8 @@ void _initReading(SENSOR *sensor) {
     // Trigger the sensor by setting the trigPin high for 10 microseconds:;
     if ((micros() - sensor->trigLastChange) > 10 && sensor->initLevel == 2) {
       digitalWrite(sensor->trigPin, LOW);
-      sensor->initLevel = 0;
-      sensor->newInit = 0;
       sensor->trigLastChange = micros();
+      sensor->initLevel = 4;
     }
   }
 }
@@ -117,7 +116,7 @@ void _getValue(SENSOR *sensor, bool enablePrinting = false) {
   }
 
   sensor->lastReading = millis();
-  sensor->newInit = 1;
+  sensor->initLevel = 0;
 }
 
 void _switchInitLevel(SENSOR *sensor, int switchTo) {

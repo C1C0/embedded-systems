@@ -36,11 +36,6 @@ typedef struct SENSOR {
   byte initLevel : 4;
 
   /**
-   * @brief Specifies, if new initialization (of measurement) should start
-   */
-  byte newInit : 1;
-
-  /**
    * @brief Duration of pulse in microseconds
    */
   unsigned long duration;
@@ -62,12 +57,51 @@ typedef struct SENSOR {
  */
 typedef struct OUTPUT_DEVICE {
   byte pin : 4;
-  byte state : 1;
+  byte state;
 
   /**
    * @brief Displayed position on display
    */
   byte uiPos[2];
 } OUTPUT_DEVICE;
+
+/**
+ * @brief Device producing sound
+ */
+typedef struct BUZZER{
+  byte pin: 4;
+
+  /**
+   * @brief specifies actual played frequency
+   */
+  int freq: 15;
+
+} BUZZER;
+
+/**
+ * @brief Button structure and states
+ */
+typedef struct BUTTON {
+  byte pin : 4;
+  byte state : 1;
+
+  /**
+   * @brief Used for comparison to "state"
+   */
+  byte previousState : 1;
+
+  /**
+   * @brief Used for delaying swithing of button
+   *        if flickers - used higher number
+   *        range: (0; 128)
+   */
+  byte debounceDelay : 7;
+
+  /**
+   * @brief Preferebly used to assigned millis() function value
+   *        for further comparison
+   */
+  unsigned long lastDebounceTimeMS;
+} BUTTON;
 
 #endif
