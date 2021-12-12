@@ -101,45 +101,44 @@ void loop() {
       switchDoor(&relay);
     }
     measureDistance(&hcsr04, true);
-    checkDistance(&hcsr04, leds, &ledRed);
+    checkDistance(&hcsr04, leds, &ledRed, &buzzer);
+    tone(buzzer.pin, buzzer.freq);
   }
 
   // closing the door
   if (relay.state && !systemActive) {
     switchDoor(&relay);
     resetAllDevicesStates(leds, INT_SIZE_OF(sizeof(leds)), LOW);
+    noTone(buzzer.pin);
   }
-
-  // if ((millis() - time) > 100) {
-  //   time = millis();
-  //   buzzer.freq += 20;
-  // }
-
-  // tone(buzzer.pin, buzzer.freq);
-
-  // Serial.println(ledRed.state);
 
   setStates();
 }
 
 void checkDistance(SENSOR *sensor, OUTPUT_DEVICE *devices[],
-                   BLINKING_LED *blinkingLed) {
+                   BLINKING_LED *blinkingLed, BUZZER *buzzer) {
   if (sensor->distance > 0 && sensor->distance <= 4) {
     blinkLed(blinkingLed);
     devices[1]->state = LOW;
     devices[0]->state = LOW;
+
+    buzzer->freq = 5000;
   }
 
   if (sensor->distance > 4 && sensor->distance <= 10) {
     devices[2]->state = LOW;
     devices[1]->state = HIGH;
     devices[0]->state = LOW;
+
+    buzzer->freq = 1000;
   }
 
   if (sensor->distance > 10) {
     devices[2]->state = LOW;
     devices[1]->state = LOW;
     devices[0]->state = HIGH;
+
+    buzzer->freq = 500;
   }
 }
 
