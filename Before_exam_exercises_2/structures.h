@@ -65,6 +65,21 @@ typedef struct OUTPUT_DEVICE {
   byte uiPos[2];
 } OUTPUT_DEVICE;
 
+typedef struct BLINKING_LED{
+  OUTPUT_DEVICE device;
+
+  /**
+   * @brief Defines how fast should LED blink ... in ms
+   * Higher the value = slower the blinking 
+   */
+  unsigned int blinkingSpeed;
+
+  /**
+   * @brief stores millis() function
+   */
+  unsigned long lastBlinkMs;
+} BLINKING_LED;
+
 /**
  * @brief Device producing sound
  */

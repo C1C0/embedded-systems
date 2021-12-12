@@ -35,6 +35,8 @@
 #include "sensor.h"
 #include "button.h"
 
+#define INT_SIZE_OF(X) (X / sizeof(int))
+
 /**
  * @brief HC-SR04 ultrasonic sensor
  * @wiring Trigger Pin: 2, Echo Pin: 3
@@ -47,13 +49,17 @@ SENSOR hcsr04 = {2, 3, 200, 0, 0};
  * @wiring IN Pin: 4
  *
  */
-OUTPUT_DEVICE relay = {4, HIGH, {0, 0}};
+OUTPUT_DEVICE relay = {4, LOW, {0, 0}};
 
 /**
  * @brief
  * @wiring pin: 5
  */
-OUTPUT_DEVICE ledRed = {5, LOW};
+BLINKING_LED ledRed = {{5, LOW}, 250};
+OUTPUT_DEVICE ledYellow = {6, LOW};
+OUTPUT_DEVICE ledGreen = {7, LOW};
+
+OUTPUT_DEVICE *leds[3] = {&ledGreen, &ledYellow, &ledRed.device};
 
 /**
  * @brief
@@ -77,7 +83,9 @@ void setup() {
   setupSensor(&hcsr04);
 
   pinMode(relay.pin, OUTPUT);
-  pinMode(ledRed.pin, OUTPUT);
+  pinMode(ledRed.device.pin, OUTPUT);
+  pinMode(ledYellow.pin, OUTPUT);
+  pinMode(ledGreen.pin, OUTPUT);
   pinMode(buzzer.pin, OUTPUT);
 
   pinMode(btn1.pin, INPUT);
@@ -86,9 +94,20 @@ void setup() {
 void loop() {
   checkButtonChangeDevState(&btn1, &systemActive);
 
+  // operations under the active system
   if (systemActive) {
-    switchDoor(&relay);
+    // opening the doors
+    if (!relay.state) {
+      switchDoor(&relay);
+    }
     measureDistance(&hcsr04, true);
+    checkDistance(&hcsr04, leds, &ledRed);
+  }
+
+  // closing the door
+  if (relay.state && !systemActive) {
+    switchDoor(&relay);
+    resetAllDevicesStates(leds, INT_SIZE_OF(sizeof(leds)), LOW);
   }
 
   // if ((millis() - time) > 100) {
@@ -103,19 +122,57 @@ void loop() {
   setStates();
 }
 
+void checkDistance(SENSOR *sensor, OUTPUT_DEVICE *devices[],
+                   BLINKING_LED *blinkingLed) {
+  if (sensor->distance > 0 && sensor->distance <= 4) {
+    blinkLed(blinkingLed);
+    devices[1]->state = LOW;
+    devices[0]->state = LOW;
+  }
+
+  if (sensor->distance > 4 && sensor->distance <= 10) {
+    devices[2]->state = LOW;
+    devices[1]->state = HIGH;
+    devices[0]->state = LOW;
+  }
+
+  if (sensor->distance > 10) {
+    devices[2]->state = LOW;
+    devices[1]->state = LOW;
+    devices[0]->state = HIGH;
+  }
+}
+
+void blinkLed(BLINKING_LED *led) {
+  if (millis() - led->lastBlinkMs > led->blinkingSpeed) {
+    led->device.state = !led->device.state;
+    led->lastBlinkMs = millis();
+    Serial.print("fugujem");
+  }
+}
+
 /**
  * @brief Sets the specified states in lopp
- * 
+ *
  */
 void setStates() {
-  digitalWrite(ledRed.pin, ledRed.state);
+  digitalWrite(ledRed.device.pin, ledRed.device.state);
+  digitalWrite(ledYellow.pin, ledYellow.state);
+  digitalWrite(ledGreen.pin, ledGreen.state);
   digitalWrite(relay.pin, relay.state);
+}
+
+void resetAllDevicesStates(OUTPUT_DEVICE *devices[], int numberOfDevices,
+                           byte state) {
+  for (int i = 0; i < numberOfDevices; i++) {
+    devices[i]->state = state;
+  }
 }
 
 /**
  * @brief Switches openning the door
- * 
- * @param operatingDevice 
+ *
+ * @param operatingDevice
  */
 void switchDoor(OUTPUT_DEVICE *operatingDevice) {
   operatingDevice->state = !operatingDevice->state;
