@@ -65,12 +65,12 @@ typedef struct OUTPUT_DEVICE {
   byte uiPos[2];
 } OUTPUT_DEVICE;
 
-typedef struct BLINKING_LED{
+typedef struct BLINKING_LED {
   OUTPUT_DEVICE device;
 
   /**
    * @brief Defines how fast should LED blink ... in ms
-   * Higher the value = slower the blinking 
+   * Higher the value = slower the blinking
    */
   unsigned int blinkingSpeed;
 
@@ -83,13 +83,13 @@ typedef struct BLINKING_LED{
 /**
  * @brief Device producing sound
  */
-typedef struct BUZZER{
-  byte pin: 4;
+typedef struct BUZZER {
+  byte pin : 4;
 
   /**
    * @brief specifies actual played frequency
    */
-  int freq: 15;
+  int freq : 15;
 
 } BUZZER;
 
@@ -118,5 +118,29 @@ typedef struct BUTTON {
    */
   unsigned long lastDebounceTimeMS;
 } BUTTON;
+
+/**
+ * @brief Defines Interrupt structure
+ */
+typedef struct INTERRUPT {
+  /**
+   * @brief Boolean in which arduino is
+   */
+  byte arduinoState;
+
+} INTERRUPT;
+
+/**
+ * @brief Defines interrupt structure with delay
+ */
+typedef struct DELAYED_INTERRUPT {
+  INTERRUPT intr;
+
+  /**
+   * @brief Delay of millis() function should be assigned here
+   */
+  unsigned long time;
+
+} DELAYED_INTERRUPT;
 
 #endif

@@ -32,6 +32,7 @@
  */
 
 #include <stdbool.h>
+#include <avr\sleep.h>
 #include "sensor.h"
 #include "button.h"
 
@@ -39,25 +40,25 @@
 
 /**
  * @brief HC-SR04 ultrasonic sensor
- * @wiring Trigger Pin: 2, Echo Pin: 3
+ * @wiring Trigger Pin: 4, Echo Pin: 5
  *
  */
-SENSOR hcsr04 = {2, 3, 200, 0, 0};
+SENSOR hcsr04 = {4, 5, 200, 0, 0};
 
 /**
  * @brief
- * @wiring IN Pin: 4
+ * @wiring IN Pin: 6
  *
  */
-OUTPUT_DEVICE relay = {4, LOW, {0, 0}};
+OUTPUT_DEVICE relay = {6, LOW, {0, 0}};
 
 /**
  * @brief
- * @wiring pin: 5
+ * @wiring RED - pin: 7, YELLOW - pin: 8, GREEN - pin: 9
  */
-BLINKING_LED ledRed = {{5, LOW}, 250};
-OUTPUT_DEVICE ledYellow = {6, LOW};
-OUTPUT_DEVICE ledGreen = {7, LOW};
+BLINKING_LED ledRed = {{7, LOW}, 250};
+OUTPUT_DEVICE ledYellow = {8, LOW};
+OUTPUT_DEVICE ledGreen = {9, LOW};
 
 OUTPUT_DEVICE *leds[3] = {&ledGreen, &ledYellow, &ledRed.device};
 
@@ -65,17 +66,20 @@ OUTPUT_DEVICE *leds[3] = {&ledGreen, &ledYellow, &ledRed.device};
  * @brief
  * @wiring plus pin: 9
  */
-BUZZER buzzer = {9, 20};
+BUZZER buzzer = {11, 20};
 
 /**
  * @brief
  * @wiring pull-down : 9
  */
-BUTTON btn1 = {8, LOW, LOW, 60};
+BUTTON btn1 = {2, LOW, LOW, 60};
 
-byte systemActive = false;
-
-unsigned long time = 0;
+/**
+ * @brief Arduino state handling structure
+ *
+ */
+DELAYED_INTERRUPT intr = {LOW};
+#define INTERRUPT_DELAY 3000
 
 void setup() {
   Serial.begin(9600);
@@ -89,40 +93,75 @@ void setup() {
   pinMode(buzzer.pin, OUTPUT);
 
   pinMode(btn1.pin, INPUT);
+
+  interruptGoToSleep(&intr.intr, 2);
 }
 
 void loop() {
-  checkButtonChangeDevState(&btn1, &systemActive);
+  // checkButtonChangeDevState(&btn1, &intr.intr.arduinoState);
 
   // operations under the active system
-  if (systemActive) {
+  if (intr.intr.arduinoState) {
     // opening the doors
     if (!relay.state) {
       switchDoor(&relay);
     }
     measureDistance(&hcsr04, true);
-    checkDistance(&hcsr04, leds, &ledRed, &buzzer);
+    checkDistance(&hcsr04, leds, &ledRed, &buzzer, &intr);
     tone(buzzer.pin, buzzer.freq);
   }
 
   // closing the door
-  if (relay.state && !systemActive) {
+  if (relay.state && !intr.intr.arduinoState) {
+    Serial.println("Closing door");
     switchDoor(&relay);
     resetAllDevicesStates(leds, INT_SIZE_OF(sizeof(leds)), LOW);
     noTone(buzzer.pin);
+    setStates();
+    interruptGoToSleep(&intr.intr, 2);
   }
 
   setStates();
 }
 
+void delayInterrupt(DELAYED_INTERRUPT *intr, int interruptDelay = 1500) {
+  if (millis() - intr->time > interruptDelay) {
+    intr->intr.arduinoState = LOW;
+    intr->time = millis();
+  }
+}
+
+void interruptGoToSleep(INTERRUPT *intr, int interruptPin) {
+  sleep_enable();
+  attachInterrupt(digitalPinToInterrupt(interruptPin), interruptWakeUp, HIGH);
+  set_sleep_mode(SLEEP_MODE_PWR_DOWN);
+  Serial.println("Going to sleep");
+  delay(20);
+  sleep_cpu();
+}
+
+void interruptWakeUp() {
+  sleep_disable();
+  intr.intr.arduinoState = HIGH;
+  Serial.println("woken up");
+}
+
 void checkDistance(SENSOR *sensor, OUTPUT_DEVICE *devices[],
-                   BLINKING_LED *blinkingLed, BUZZER *buzzer) {
+                   BLINKING_LED *blinkingLed, BUZZER *buzzer,
+                   DELAYED_INTERRUPT *intr) {
   if (sensor->distance > 0 && sensor->distance <= 4) {
     blinkLed(blinkingLed);
     devices[1]->state = LOW;
     devices[0]->state = LOW;
 
     buzzer->freq = 5000;
+
+    // get the millis to delayed interrupt
+    if(intr->time + INTERRUPT_DELAY + 100 < millis()){
+      intr->time = millis();
+    }
+
+    delayInterrupt(intr, INTERRUPT_DELAY);
   }
 
   if (sensor->distance > 4 && sensor->distance <= 10) {
@@ -146,7 +185,6 @@ void blinkLed(BLINKING_LED *led) {
   if (millis() - led->lastBlinkMs > led->blinkingSpeed) {
     led->device.state = !led->device.state;
     led->lastBlinkMs = millis();
-    Serial.print("fugujem");
   }
 }
 
