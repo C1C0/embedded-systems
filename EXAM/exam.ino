@@ -44,28 +44,45 @@ typedef struct DHT_S {
   unsigned long lastReading;
 } DHT_S;
 
-TEMP_METER lm35 = {A0, 0, 2000, 0};
+TEMP_METER lm35 = {A0, 0, 500, 0};
 
 #define DHTPIN 7
-#define DHTTYPE DHT11 
+#define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
-DHT_S dhtS = {2000, 0};
+DHT_S dhtS = {500, 0};
+
+float tempDiff = 0;
 
 void setup() {
   Serial.begin(9600);
+  dht.begin();
 
   initLCD(&lcd);
 
-  printToLCD(&lcd, 3, 2, "Hello world 1");
-
-  dht.begin();
-
-  delay(2000);
+  delay(1000);
 }
 
 void loop() {
   delayedTempCheck(&lcd, &lm35);
   checkTempDigital(&lcd, &dht, &dhtS);
+  checkTempDiff(&lcd, &dhtS, &lm35);
+}
+
+void checkTempDiff(LiquidCrystal_I2C *lcd, DHT_S *dht_s, TEMP_METER *lm) {
+  float differenceNow = abs(dht_s->value - lm->value);
+
+  if (differenceNow != tempDiff) {
+    tempDiff = differenceNow;
+
+    char tempS[11] = "DI:";
+
+    // Convert float value into string
+    dtostrf(tempDiff, -3, 1, tempS + 3);
+    // Append C
+    strcat(tempS, "C");
+
+    printToLCD(lcd, 10, 0, tempS);
+  }
 }
 
 /**
@@ -76,6 +93,11 @@ void loop() {
 void initLCD(LiquidCrystal_I2C *lcd) {
   lcd->init();
   lcd->backlight();
+
+  printToLCD(lcd, 4, 2, "temp. meter");
+  printToLCD(lcd, 6, 3, "tester");
+  delay(1000);
+  lcd->clear();
 }
 
 /**
@@ -128,6 +150,13 @@ void checkTempAnalog(TEMP_METER *temp) {
   temp->value = analogRead(lm35.pin) * (5000 / 1024.0F) / 10;
 }
 
+/**
+ * @brief Delays the printing and checs digital temp meter
+ *
+ * @param lcd
+ * @param dht
+ * @param dht_s
+ */
 void checkTempDigital(LiquidCrystal_I2C *lcd, DHT *dht, DHT_S *dht_s) {
   if (millis() - dht_s->lastMeasurement > dht_s->delay) {
     char tempS[11] = "D7:";
